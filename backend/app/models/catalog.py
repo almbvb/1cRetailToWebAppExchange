@@ -26,6 +26,8 @@ class CatalogGroup(Base):
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True)
     parent_id: Mapped[uuid.UUID | None] = mapped_column(Uuid)
     name: Mapped[str] = mapped_column(Text)
+    # api_spec 0.9: порядок разделов верхнего уровня (номер строки отбора в 1С); у подгрупп 0.
+    sort: Mapped[int] = mapped_column(Integer, server_default="0")
     deleted: Mapped[bool] = mapped_column(Boolean, server_default=false())
     received_at: Mapped[datetime] = _received_at()
 
