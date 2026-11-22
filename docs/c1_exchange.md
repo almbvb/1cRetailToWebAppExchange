@@ -13,6 +13,9 @@
   `400 INVALID_FORMAT` (неверный JSON, нет обязательных полей, неверные типы; `details` — список полей),
   `401 UNAUTHORIZED`, `413 IMAGE_TOO_LARGE`, `415 UNSUPPORTED_IMAGE`, `500 INTERNAL_ERROR`.
 - **Неизвестные поля** игнорируются. Ошибка в одной записи — вся порция `400` (1С повторит порцию).
+- **Проверяем только то, что задаёт контракт** (К-5): обязательные поля, типы, формат GUID.
+  Своих пределов длины и значений не вводим — иначе одна запись остановит весь поток (1С повторяет
+  порцию без конца). Строки в БД — `text`; `article` и `description` могут быть пустыми или `null`.
 - **Порция — одна транзакция.** Ответ `200 {"ok": true, "counts": {...}}` только после фиксации.
 - **Идемпотентность.** Запись по ключу заменяется целиком (UPSERT). Дубли ключа внутри одной порции —
   остаётся последняя (иначе `ON CONFLICT` падает на повторной строке).
@@ -36,7 +39,7 @@
 |---|---|---|
 | `catalog_groups` | `id` uuid | `parent_id` uuid null, `name`, `deleted`, `received_at` |
 | `catalog_units` | `id` uuid | `name`, `code`, `received_at` |
-| `catalog_products` | `id` uuid | `group_id` null, `name`, `article`, `unit_id`, `weighted`, `description`, `deleted`, `received_at` |
+| `catalog_products` | `id` uuid | `group_id` null, `name`, `article` null, `unit_id`, `weighted`, `description` null, `deleted`, `received_at` (строки — `text`) |
 | `catalog_prices` | `store_id`, `product_id` | `price` numeric(12,2), `received_at` |
 | `catalog_stock` | `store_id`, `product_id` | `available` numeric(14,3), `updated_at` timestamptz (из 1С), `received_at` |
 | `catalog_images` | `product_id` | `content_type`, `size_bytes`, `sha256`, `width`, `height`, `original_path`, `received_at` |

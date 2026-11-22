@@ -46,3 +46,8 @@ PostgreSQL 18.7, переносная сборка EnterpriseDB (zip 389 МБ, �
 Backend: FastAPI 0.165, SQLAlchemy 2.1, psycopg 3.3, Alembic 1.20, pydantic-settings, SQLAdmin 0.32 (версии закреплены в `backend/pyproject.toml`). `/api/health`, пустой роутер `/exchange/1c`, тесты на отдельной базе с откатом. Проверено ведущим: pytest 5 passed, ruff чисто.
 Frontend: Vite 8, React 19, TypeScript, vite-plugin-pwa 2.0, react-router; тема — `src/theme/` (пастельный зелёный, заглушки реквизитов). Линтер oxlint (новый шаблон Vite). Проверено ведущим: lint, typecheck, build (manifest + sw); на 375 px связка с backend работает («Сервер доступен»).
 Замечания на потом: предупреждение Starlette о TestClient; `npm audit` — 4 средних в инструментах сборки workbox (не в рантайме).
+
+## №8 | Сайт | КОНТРАКТ
+Основание: К-5 журнала контракта (ПРОВЕРКА проекта С1 сессией 1С)
+
+Проект С1 соответствует `api_spec.md` 0.8. Замечание принято: на приёме проверяем только обязательные поля, типы и GUID; своих пределов длины и значений нет, строки — `text`, `article`/`description` могут быть пустыми. Внесено в `docs/c1_exchange.md`.
