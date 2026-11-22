@@ -18,7 +18,7 @@
 - Тестовые GUID: магазин `423a7136-cfce-11ed-b67f-a8a159e65459`; ванилин `4730ff25-5b92-11ee-b698-a8a159e65459`.
 - Переключение 1С на сайт — пользователь, форма «Настройки обмена с приложением».
 - Админпанель: http://127.0.0.1:8090/admin, логин `admin`, пароль — `.env` (`ADMIN_PASSWORD`).
-- Повтор данных заглушки: `backend\.venv\Scripts\python.exe toolseplay_mock.py --verify` (см. `tools/README.md`).
+- Повтор данных заглушки: `backend\.venv\Scripts\python.exe tools\eplay_mock.py --verify` (см. `tools/README.md`).
 
 ## Этапы (статус)
 - С0 Основа: репозиторий, `.env.example`, журнал, state, PostgreSQL, каркас backend (FastAPI, Alembic, тесты) и frontend (Vite + React + PWA, тема). — **принят пользователем (№9)**
