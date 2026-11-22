@@ -1,0 +1,3 @@
+# Артефакты установки пакета (pip install -e .)
+*.egg-info/
+build/

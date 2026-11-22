@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="%THEME_LANG%">
+  <head>
+    <meta charset="UTF-8" />
+    <!-- viewport-fit=cover — для «чёлки» iPhone; отступы учитываются через env(safe-area-inset-*) -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>%THEME_NAME%</title>
+    <meta name="description" content="%THEME_DESCRIPTION%" />
+    <meta name="theme-color" content="%THEME_COLOR%" />
+
+    <link rel="icon" href="/brand/favicon.ico" sizes="48x48" />
+    <link rel="icon" href="/brand/logo.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/brand/apple-touch-icon-180x180.png" />
+
+    <!-- Установка на экран «Домой» (iOS Safari и Android) -->
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="%THEME_SHORT_NAME%" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="format-detection" content="telephone=no" />
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

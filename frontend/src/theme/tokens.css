@@ -1,0 +1,64 @@
+/*
+ * Дизайн-токены темы. Меняются под клиента вместе с theme.config.ts.
+ * Компоненты используют только эти переменные — цвета и размеры в них не «зашиты».
+ * Если меняете --color-header-bg или --color-bg, поправьте colors в theme.config.ts.
+ */
+:root {
+  /* Фон и поверхности */
+  --color-bg: #f7fbf6;
+  --color-surface: #ffffff;
+  --color-header-bg: #eaf6ec;
+  --color-footer-bg: #eef7ef;
+
+  /* Пастельные зелёные */
+  --color-pastel-1: #f0f8f1;
+  --color-pastel-2: #e1f2e4;
+  --color-pastel-3: #c9e8cf;
+
+  /* Акцент (кнопки, активные пункты). Белый текст на нём — контраст не ниже 4.5:1 */
+  --color-accent: #23864a;
+  --color-accent-hover: #1c7240;
+  --color-accent-contrast: #ffffff;
+
+  /* Текст и линии */
+  --color-text: #1f2d24;
+  --color-text-muted: #5b6e61;
+  --color-border: #dbe9dd;
+
+  /* Статусы */
+  --color-success: #23864a;
+  --color-danger: #c0392b;
+  --color-warning: #b7791f;
+
+  /* Шрифт — системный стек, без внешних CDN */
+  --font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial,
+    'Noto Sans', sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji';
+  --font-size-base: 16px;
+  --font-size-sm: 14px;
+  --font-size-xs: 12px;
+  --font-size-lg: 18px;
+  --font-size-xl: 22px;
+  --line-height: 1.5;
+
+  /* Скругления */
+  --radius-sm: 8px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
+  --radius-pill: 999px;
+
+  /* Мягкие тени */
+  --shadow-sm: 0 1px 3px rgb(31 45 36 / 0.06), 0 1px 2px rgb(31 45 36 / 0.04);
+  --shadow-md: 0 6px 18px rgb(31 45 36 / 0.08);
+  --shadow-nav: 0 -4px 16px rgb(31 45 36 / 0.06);
+
+  /* Отступы и размеры каркаса */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --content-max-width: 1120px;
+  --header-height: 56px;
+  --bottom-nav-height: 60px;
+}

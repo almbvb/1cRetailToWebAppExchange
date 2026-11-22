@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Логотип">
+  <!-- Заглушка логотипа: зелёный круг с корзинкой и листиком. Исходник для PNG-иконок (npm run generate-pwa-assets). -->
+  <circle cx="256" cy="256" r="256" fill="#3f9e5a"/>
+  <!-- листик -->
+  <path d="M250 200c-34-46-30-98 14-136 40 42 38 96-14 136z" fill="#c9ecd0"/>
+  <path d="M250 196c4-40 6-74 12-118" fill="none" stroke="#3f9e5a" stroke-width="8" stroke-linecap="round"/>
+  <!-- ручка корзинки -->
+  <path d="M168 236c0-52 40-88 88-88s88 36 88 88" fill="none" stroke="#ffffff" stroke-width="24" stroke-linecap="round"/>
+  <!-- корзинка -->
+  <path d="M118 228h276a14 14 0 0 1 13.6 17.4L372 384a28 28 0 0 1-27.2 21.6H167.2A28 28 0 0 1 140 384l-35.6-138.6A14 14 0 0 1 118 228z" fill="#ffffff"/>
+  <path d="M200 272v92M256 272v92M312 272v92" stroke="#3f9e5a" stroke-width="16" stroke-linecap="round"/>
+</svg>
