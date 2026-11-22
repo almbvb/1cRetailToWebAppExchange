@@ -18,13 +18,14 @@ orders_status.py. Коротко:
 
 import itertools
 import json
+import logging
 import uuid
 from collections.abc import Awaitable, Callable, Hashable, Iterable, Mapping, Sequence
 from decimal import Decimal
-from typing import Any
+from typing import Annotated, Any
 
 from fastapi import Request
-from pydantic import AwareDatetime, BaseModel, ConfigDict, ValidationError
+from pydantic import AfterValidator, AwareDatetime, BaseModel, ConfigDict, ValidationError
 from sqlalchemy import ColumnElement, func
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
@@ -34,16 +35,37 @@ from app.config import get_settings
 from app.exchange.onec.errors import INVALID_FORMAT, PAYLOAD_TOO_LARGE, ExchangeError, validation_details
 from app.exchange.onec.journal import ExchangeJournal, get_journal
 
+logger = logging.getLogger(__name__)
+
 # Предел тела JSON-порции (docs/c1_exchange.md). Читается при каждом запросе — тесты могут подменить.
 JSON_MAX_BYTES = 20 * 1024 * 1024
 
 # Лимит PostgreSQL — 65535 параметров на запрос; берём с запасом.
 MAX_PARAMS_PER_STATEMENT = 30_000
 
+# Пределы самого типа numeric PostgreSQL (не свои, К-5): до 131072 цифр до запятой и 16383 после.
+# Значение за ними PostgreSQL не примет вовсе (500 и бесконечный повтор порции), поэтому — 400.
+PG_NUMERIC_MAX_INT_DIGITS = 131072
+PG_NUMERIC_MAX_SCALE = 16383
+
+
+def pg_numeric(value: Decimal) -> Decimal:
+    """Число для столбца numeric без разрядности: конечное и в пределах типа; хранится как пришло."""
+    if not value.is_finite():
+        raise ValueError("Число должно быть конечным")
+    exponent = value.as_tuple().exponent
+    assert isinstance(exponent, int)  # для конечного числа — всегда int
+    if exponent < -PG_NUMERIC_MAX_SCALE or (value and value.adjusted() >= PG_NUMERIC_MAX_INT_DIGITS):
+        raise ValueError("Число вне пределов типа numeric PostgreSQL")
+    return value
+
+
 # Типы полей для моделей порций (К-5: только тип и формат, без своих пределов).
 Guid = uuid.UUID  # GUID 1С; в БД — uuid
-Money = Decimal  # цена, сумма; в БД — numeric(12,2)
-Quantity = Decimal  # количество, остаток; в БД — numeric(14,3)
+# Числа — Decimal без округления; в БД — numeric без разрядности (округление — дело витрины).
+# NaN и Infinity отклоняет уже pydantic (Decimal по умолчанию только конечный) — 400.
+Money = Annotated[Decimal, AfterValidator(pg_numeric)]  # цена, сумма
+Quantity = Annotated[Decimal, AfterValidator(pg_numeric)]  # количество, остаток
 Timestamp = AwareDatetime  # ISO 8601 с часовым поясом; в БД — timestamptz
 
 
@@ -88,11 +110,37 @@ def _reject_constant(name: str) -> Any:
     raise ValueError(f"Недопустимое значение {name}")
 
 
+def strip_nul(value: Any) -> tuple[Any, int]:
+    """Убирает U+0000 из всех строк (и ключей) разобранного JSON; возвращает (данные, сколько убрано)."""
+    if isinstance(value, str):
+        count = value.count("\x00")
+        return (value.replace("\x00", "") if count else value), count
+    if isinstance(value, list):
+        total = 0
+        items = []
+        for item in value:
+            cleaned, count = strip_nul(item)
+            items.append(cleaned)
+            total += count
+        return items, total
+    if isinstance(value, dict):
+        total = 0
+        result = {}
+        for key, item in value.items():
+            clean_key, key_count = strip_nul(key)
+            cleaned, count = strip_nul(item)
+            result[clean_key] = cleaned
+            total += key_count + count
+        return result, total
+    return value, 0
+
+
 def parse_json[M: BaseModel](raw: bytes, model: type[M], journal: ExchangeJournal | None = None) -> M:
     """bytes -> модель. Неверный JSON или неверные поля -> ExchangeError(400 INVALID_FORMAT, details).
 
     Дробные числа разбираются в Decimal (без потерь для цен и количеств). Если в теле есть булево full,
-    оно записывается в журнал даже при ошибке валидации.
+    оно записывается в журнал даже при ошибке валидации; у потоков с full в модели (catalog, prices, stock)
+    отсутствующее full пишется как false — так его и понимает порция (у images, orders/status — null).
     """
     try:
         # Контракт — UTF-8; BOM допускается.
@@ -102,8 +150,18 @@ def parse_json[M: BaseModel](raw: bytes, model: type[M], journal: ExchangeJourna
         raise ExchangeError(
             400, INVALID_FORMAT, "Неверный JSON", [{"field": "body", "message": str(exc)}]
         ) from None
-    if journal is not None and isinstance(data, dict) and isinstance(data.get("full"), bool):
-        journal.full = data["full"]
+    data, nul_removed = strip_nul(data)
+    if nul_removed:
+        # К-10: PostgreSQL не хранит U+0000 в text; 400 остановил бы поток — символ убираем и считаем.
+        logger.warning("Обмен с 1С: из строк порции убрано символов U+0000: %d", nul_removed)
+        if journal is not None:
+            journal.nul_removed = nul_removed
+    if journal is not None and isinstance(data, dict):
+        full_field = model.model_fields.get("full")
+        if isinstance(data.get("full"), bool):
+            journal.full = data["full"]
+        elif "full" not in data and full_field is not None and isinstance(full_field.default, bool):
+            journal.full = full_field.default  # значение по умолчанию модели порции (false)
     try:
         return model.model_validate(data)
     except ValidationError as exc:
@@ -202,6 +260,8 @@ def upsert(
 
 def ok_response(journal: ExchangeJournal, **counts: int) -> dict[str, Any]:
     """Ответ 200 {"ok": true, "counts": {...}}; счётчики попадают и в журнал. Вызывать после commit."""
+    if journal.nul_removed:
+        counts["nul_removed"] = journal.nul_removed
     journal.counts = dict(counts)
     return {"ok": True, "counts": dict(counts)}
 

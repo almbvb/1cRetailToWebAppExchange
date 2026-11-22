@@ -37,15 +37,17 @@
 
 | Таблица | Ключ | Поля |
 |---|---|---|
-| `catalog_groups` | `id` uuid | `parent_id` uuid null, `name`, `deleted`, `received_at` |
+| `catalog_groups` | `id` uuid | `parent_id` uuid null, `name`, `sort` integer (0.9), `deleted`, `received_at` |
 | `catalog_units` | `id` uuid | `name`, `code`, `received_at` |
-| `catalog_products` | `id` uuid | `group_id` null, `name`, `article` null, `unit_id`, `weighted`, `description` null, `deleted`, `received_at` (строки — `text`) |
-| `catalog_prices` | `store_id`, `product_id` | `price` numeric(12,2), `received_at` |
-| `catalog_stock` | `store_id`, `product_id` | `available` numeric(14,3), `updated_at` timestamptz (из 1С), `received_at` |
+| `catalog_products` | `id` uuid | `group_id` null, `name`, `article` null, `unit_id` null (услуга без единицы), `weighted`, `description` null, `deleted`, `received_at` (строки — `text`) |
+| `catalog_prices` | `store_id`, `product_id` | `price` numeric, `received_at` |
+| `catalog_stock` | `store_id`, `product_id` | `available` numeric, `updated_at` timestamptz (из 1С), `received_at` |
 | `catalog_images` | `product_id` | `content_type`, `size_bytes`, `sha256`, `width`, `height`, `original_path`, `received_at` |
-| `orders` | `order_id` varchar(36) | `number` (номер сайта, null до С4), `onec_number`, `status`, `onec_created_at`, `onec_changed_at`, `total` numeric(12,2), `received_at` |
-| `order_onec_items` | `order_id`, `line_no` | `product_id`, `quantity` numeric(14,3), `price`, `amount`, `cancelled` |
+| `orders` | `order_id` varchar(36) | `number` (номер сайта, null до С4), `onec_number`, `status`, `onec_created_at`, `onec_changed_at`, `total` numeric, `received_at` |
+| `order_onec_items` | `order_id`, `line_no` | `product_id`, `quantity`, `price`, `amount` (numeric), `cancelled` |
 | `exchange_batches` | `id` bigserial | см. «Журнал обмена» |
+
+Числа — `numeric` без разрядности: значения хранятся как пришли (Decimal), округление — дело витрины.
 
 `orders` создаётся уже в С1: статус может прийти по заказу, которого сайт не создавал (тесты через заглушку) —
 он сохраняется. Поля покупателя и состав, который видел покупатель, добавит С4.

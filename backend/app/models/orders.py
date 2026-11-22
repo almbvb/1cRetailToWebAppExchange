@@ -2,6 +2,7 @@
 
 Заказ создаётся уже в С1: статус может прийти по заказу, которого сайт не создавал, — он сохраняется.
 Поля покупателя и состав, который видел покупатель, добавит С4. Внешних ключей нет.
+Суммы и количества — numeric без разрядности (К-5): хранятся как пришли, округление — дело витрины.
 """
 
 import uuid
@@ -27,7 +28,7 @@ class Order(Base):
     onec_created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     # changed_at из 1С: статус с более ранним changed_at не заменяет более поздний.
     onec_changed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
-    total: Mapped[Decimal] = mapped_column(Numeric(12, 2))
+    total: Mapped[Decimal] = mapped_column(Numeric)
     received_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
@@ -39,7 +40,7 @@ class OrderOnecItem(Base):
     order_id: Mapped[str] = mapped_column(String(36), primary_key=True)
     line_no: Mapped[int] = mapped_column(Integer, primary_key=True)
     product_id: Mapped[uuid.UUID] = mapped_column(Uuid)
-    quantity: Mapped[Decimal] = mapped_column(Numeric(14, 3))
-    price: Mapped[Decimal] = mapped_column(Numeric(12, 2))
-    amount: Mapped[Decimal] = mapped_column(Numeric(12, 2))
+    quantity: Mapped[Decimal] = mapped_column(Numeric)
+    price: Mapped[Decimal] = mapped_column(Numeric)
+    amount: Mapped[Decimal] = mapped_column(Numeric)
     cancelled: Mapped[bool] = mapped_column(Boolean)

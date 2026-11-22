@@ -1,6 +1,7 @@
 """С1-Т1: вход, формат ошибок, разбор JSON, транзакция порции, журнал обмена, общие хелперы UPSERT."""
 
 import base64
+import io
 import logging
 import uuid
 from collections.abc import Callable
@@ -10,6 +11,7 @@ from typing import Annotated, Any
 
 import pytest
 from fastapi import APIRouter, Depends, FastAPI
+from PIL import Image
 from sqlalchemy.orm import Session
 
 from app.db import get_db
@@ -92,13 +94,21 @@ def assert_error(response: Any, status: int, code: str) -> dict[str, Any]:
     return body["error"]
 
 
-STUBS = [
-    ("POST", "/catalog", "catalog"),
-    ("POST", "/prices", "prices"),
-    ("POST", "/stock", "stock"),
-    ("PUT", f"/images/{uuid.uuid4()}", "images"),
-    ("DELETE", f"/images/{uuid.uuid4()}", "images"),
-    ("POST", "/orders/status", "orders_status"),
+def tiny_png() -> bytes:
+    buffer = io.BytesIO()
+    Image.new("RGB", (2, 2), (255, 0, 0)).save(buffer, format="PNG")
+    return buffer.getvalue()
+
+
+# Потоки с минимальными корректными телами: (метод, путь, тело, Content-Type, поток, full в журнале).
+# full: у потоков с full в порции (catalog, prices, stock) отсутствующий full — false; у прочих — null.
+STREAMS = [
+    ("POST", "/catalog", b'{"full": false}', "application/json", "catalog", False),
+    ("POST", "/prices", b'{"full": false, "prices": []}', "application/json", "prices", False),
+    ("POST", "/stock", b'{"stock": []}', "application/json", "stock", False),
+    ("PUT", f"/images/{uuid.uuid4()}", tiny_png(), "image/png", "images", None),
+    ("DELETE", f"/images/{uuid.uuid4()}", None, None, "images", None),
+    ("POST", "/orders/status", b'{"orders": []}', "application/json", "orders_status", None),
 ]
 
 
@@ -158,26 +168,49 @@ def test_basic_not_configured_401(
     assert_error(response, 401, "UNAUTHORIZED")
 
 
-@pytest.mark.parametrize(("method", "path", "stream"), STUBS)
-def test_valid_basic_reaches_stub(
-    exchange_client: ExchangeClient, last_journal: Callable, method: str, path: str, stream: str
+def assert_ok(response: Any) -> dict[str, Any]:
+    assert response.status_code == 200, response.text
+    assert response.headers["content-type"] == "application/json; charset=utf-8"
+    body = response.json()
+    assert body["ok"] is True
+    return body["counts"]
+
+
+@pytest.mark.parametrize(
+    ("method", "path", "content", "content_type", "stream", "full"),
+    STREAMS,
+    ids=[f"{method}-{stream}" for method, _, _, _, stream, _ in STREAMS],
+)
+def test_valid_basic_reaches_stream(
+    exchange_client: ExchangeClient,
+    last_journal: Callable,
+    method: str,
+    path: str,
+    content: bytes | None,
+    content_type: str | None,
+    stream: str,
+    full: bool | None,
 ) -> None:
-    response = exchange_client.request(method, path, content=b"{}")
-    assert_error(response, 501, "NOT_IMPLEMENTED")
+    headers = {"Content-Type": content_type} if content_type else None
+    counts = assert_ok(exchange_client.request(method, path, content=content, headers=headers))
     row = last_journal()
-    assert row["stream"] == stream
-    assert row["status_code"] == 501
+    assert (row["method"], row["path"], row["stream"]) == (method, EXCHANGE_PREFIX + path, stream)
+    assert row["status_code"] == 200
     assert row["auth"] == f"Basic user={TEST_BASIC_USER}"
-    assert row["error_code"] == "NOT_IMPLEMENTED"
+    assert row["full"] is full
+    assert row["counts"] == counts
+    assert (row["error_code"], row["error_message"]) == (None, None)
 
 
 def test_bearer(exchange_client: ExchangeClient, journal_rows: Callable) -> None:
-    good = {"Authorization": f"Bearer {TEST_BEARER_TOKEN}"}
-    assert_error(exchange_client.request("POST", "/prices", headers=good, auth=None), 501, "NOT_IMPLEMENTED")
-    bad = {"Authorization": "Bearer wrong-token"}
-    assert_error(exchange_client.request("POST", "/prices", headers=bad, auth=None), 401, "UNAUTHORIZED")
+    body = b'{"full": false, "prices": []}'
+    good = {"Authorization": f"Bearer {TEST_BEARER_TOKEN}", "Content-Type": "application/json"}
+    assert_ok(exchange_client.request("POST", "/prices", content=body, headers=good, auth=None))
+    bad = {"Authorization": "Bearer wrong-token", "Content-Type": "application/json"}
+    response = exchange_client.request("POST", "/prices", content=body, headers=bad, auth=None)
+    assert_error(response, 401, "UNAUTHORIZED")
     rows = journal_rows()
-    assert [(row["auth"], row["status_code"]) for row in rows] == [("Bearer", 401), ("Bearer", 501)]
+    assert [(row["auth"], row["status_code"]) for row in rows] == [("Bearer", 401), ("Bearer", 200)]
     assert TEST_BEARER_TOKEN not in repr(rows)
 
 
@@ -236,6 +269,26 @@ def test_validation_details_have_field_paths(probe_client: ExchangeClient, last_
     assert [detail["field"] for detail in error["details"]] == ["units"]
     error = assert_error(probe_client.post_json("/_probe/units", [1, 2]), 400, INVALID_FORMAT)
     assert [detail["field"] for detail in error["details"]] == ["body"]
+
+
+def test_full_in_journal(
+    probe_client: ExchangeClient, exchange_client: ExchangeClient, last_journal: Callable
+) -> None:
+    """full: как пришло; нет поля у порции с full — false; у порции без full (orders/status) — null."""
+    units = {"units": []}
+    for body, expected in [(units | {"full": True}, True), (units | {"full": False}, False), (units, False)]:
+        response = probe_client.post_json("/_probe/units", body)
+        assert response.status_code == 200, response.text
+        assert last_journal()["full"] is expected
+    # Неверный JSON — full неизвестен; неверный тип full — тоже не отмечается.
+    assert_error(probe_client.post_json("/_probe/units", b"{"), 400, INVALID_FORMAT)
+    assert last_journal()["full"] is None
+    assert_error(probe_client.post_json("/_probe/units", units | {"full": "да"}), 400, INVALID_FORMAT)
+    assert last_journal()["full"] is None
+    assert_ok(exchange_client.post_json("/orders/status", {"orders": []}))
+    assert last_journal()["full"] is None
+    assert_ok(exchange_client.post_json("/orders/status", {"full": True, "orders": []}))
+    assert last_journal()["full"] is True  # булево full из тела пишется всегда
 
 
 def test_unknown_fields_ignored_and_ok_response(
@@ -299,7 +352,7 @@ def test_journal_failure_does_not_break_response(
 
     monkeypatch.setattr(journal, "journal_session_factory", broken_session)
     caplog.set_level(logging.ERROR, logger="app.exchange.onec.journal")
-    assert_error(exchange_client.post_json("/catalog", {}), 501, "NOT_IMPLEMENTED")
+    assert_ok(exchange_client.post_json("/prices", {"full": False, "prices": []}))
     assert journal_rows() == []
     assert "Сбой записи журнала обмена" in caplog.text
 

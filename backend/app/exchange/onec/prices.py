@@ -1,31 +1,60 @@
-"""ЗАГЛУШКА С1-Т1. Поток цен POST /exchange/1c/prices (api_spec.md 3.2) — реализует Т2.
+"""Поток цен POST /exchange/1c/prices (api_spec.md 3.2; docs/c1_exchange.md — «Общие правила приёма»).
 
-Инструкция исполнителю Т2 (файл переписывается целиком; docs/c1_exchange.md — «Общие правила приёма»):
+Порция: `{full, prices: [{store_id, product_id, price}]}`; все три поля записи обязательны.
+Запись — UPSERT по (store_id, product_id), повтор ключа в порции — остаётся последняя; вся порция —
+одна транзакция. `full: true` ничего не удаляет. Цена может прийти раньше карточки товара — сохраняется.
+Цена 0 сохраняется как есть (товар не продаётся — решает витрина). Своих пределов нет (К-5): цена пишется
+как пришла (Decimal, столбец numeric без разрядности, без округления — округляет витрина); проверяется
+только, что это конечное число в пределах типа numeric PostgreSQL (common.Money; иначе — 400 с полем).
+`store_id` не равный ONEC_STORE_ID сохраняется и считается в `counts.other_store`.
 
-1. Маршрут: `router = APIRouter()` и `@router.post("/prices")`; префикс /exchange/1c и вход (Basic/Bearer)
-   уже даёт router.py — сами не проверяйте. Обработчик — обычная `def` (синхронная БД).
-2. Тело: модели порции наследуйте от `common.ExchangeModel`, типы `common.Guid`, `Money`; параметр
-   `body: Annotated[PricesIn, Depends(json_body(PricesIn))]` — предел 20 МБ, ошибки -> 400 INVALID_FORMAT
-   с details вида `prices[3].product_id`. Проверяйте только то, что задаёт контракт (К-5).
-3. БД: `db: Annotated[Session, Depends(get_db)]` (app.db). Порция — одна транзакция: upsert, затем
-   `db.commit()`, затем ответ.
-4. Запись: `upsert(db, CatalogPrice, rows)` из common (ключ store_id+product_id, повторы — последняя).
-   Цена может прийти раньше карточки товара — сохраняется (внешних ключей нет).
-   store_id != ONEC_STORE_ID (`common.own_store_id()`) — сохранить и посчитать в counts.other_store.
-5. Журнал: параметр `journal: Journal` (journal.py); stream и full выставляются сами;
-   `return ok_response(journal, prices=…, other_store=…)` -> 200 {"ok": true, "counts": {...}}.
-6. Ошибка порции: `raise ExchangeError(400, INVALID_FORMAT, "текст", details)` (errors.py).
-7. Тесты: tests/exchange/conftest.py — `exchange_client.post_json("/prices", body)`, `db_fetch`,
-   `journal_rows`.
+Ответ: `counts` — prices (записано строк после удаления повторов ключа), other_store (из них чужой магазин).
 """
 
-from fastapi import APIRouter
+from typing import Annotated, Any
 
-from app.exchange.onec.errors import NOT_IMPLEMENTED, ExchangeError
+from fastapi import APIRouter, Depends
+from sqlalchemy.orm import Session
+
+from app.db import get_db
+from app.exchange.onec.common import (
+    ExchangeModel,
+    Guid,
+    Money,
+    dedupe_last,
+    json_body,
+    ok_response,
+    own_store_id,
+    upsert,
+)
+from app.exchange.onec.journal import Journal
+from app.models import CatalogPrice
 
 router = APIRouter()
 
 
-@router.post("/prices", summary="Цены (заглушка)")
-def receive_prices() -> None:
-    raise ExchangeError(501, NOT_IMPLEMENTED, "Поток prices ещё не реализован")
+class PriceIn(ExchangeModel):
+    store_id: Guid
+    product_id: Guid
+    price: Money
+
+
+class PricesIn(ExchangeModel):
+    full: bool = False
+    prices: list[PriceIn] = []
+
+
+@router.post("/prices", summary="Цены")
+def receive_prices(
+    body: Annotated[PricesIn, Depends(json_body(PricesIn))],
+    db: Annotated[Session, Depends(get_db)],
+    journal: Journal,
+) -> dict[str, Any]:
+    items = dedupe_last(body.prices, key=lambda item: (item.store_id, item.product_id))
+    rows = [{"store_id": i.store_id, "product_id": i.product_id, "price": i.price} for i in items]
+    written = upsert(db, CatalogPrice, rows)
+    db.commit()  # ответ 200 — только после фиксации всей порции
+
+    own = own_store_id()
+    other_store = sum(item.store_id != own for item in items)
+    return ok_response(journal, prices=written, other_store=other_store)

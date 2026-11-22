@@ -62,6 +62,8 @@ class ExchangeJournal:
     stream: str | None = None
     full: bool | None = None
     counts: dict[str, Any] | None = None
+    # Сколько символов U+0000 убрано из строк порции (К-10); попадает в counts.nul_removed.
+    nul_removed: int = 0
     error_code: str | None = None
     error_message: str | None = None
     received_at: datetime = field(default_factory=lambda: datetime.now(UTC))

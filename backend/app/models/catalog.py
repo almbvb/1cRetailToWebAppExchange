@@ -1,7 +1,8 @@
 """Каталог, принятый из 1С (api_spec.md, разд. 3.1–3.4; docs/c1_exchange.md, «Модель данных»).
 
 Внешних ключей между таблицами нет: потоки 1С независимы, остаток, цена или картинка могут прийти
-раньше карточки товара. Строки — text без пределов длины (К-5). received_at — момент последнего приёма записи.
+раньше карточки товара. Строки — text без пределов длины, числа — numeric без разрядности (К-5):
+значения хранятся как пришли, округление — дело витрины. received_at — момент последнего приёма записи.
 """
 
 import uuid
@@ -52,7 +53,8 @@ class CatalogProduct(Base):
     group_id: Mapped[uuid.UUID | None] = mapped_column(Uuid, index=True)
     name: Mapped[str] = mapped_column(Text)
     article: Mapped[str | None] = mapped_column(Text)
-    unit_id: Mapped[uuid.UUID] = mapped_column(Uuid)
+    # null допускается: у позиции-услуги (обычно deleted: true) в 1С нет единицы.
+    unit_id: Mapped[uuid.UUID | None] = mapped_column(Uuid)
     weighted: Mapped[bool] = mapped_column(Boolean)
     description: Mapped[str | None] = mapped_column(Text)
     deleted: Mapped[bool] = mapped_column(Boolean, server_default=false(), index=True)
@@ -66,7 +68,7 @@ class CatalogPrice(Base):
 
     store_id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True)
     product_id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, index=True)
-    price: Mapped[Decimal] = mapped_column(Numeric(12, 2))
+    price: Mapped[Decimal] = mapped_column(Numeric)
     received_at: Mapped[datetime] = _received_at()
 
 
@@ -77,7 +79,7 @@ class CatalogStock(Base):
 
     store_id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True)
     product_id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, index=True)
-    available: Mapped[Decimal] = mapped_column(Numeric(14, 3))
+    available: Mapped[Decimal] = mapped_column(Numeric)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     received_at: Mapped[datetime] = _received_at()
 

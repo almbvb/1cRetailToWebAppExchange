@@ -69,6 +69,11 @@ class Settings(BaseSettings):
     # Относительный путь считается от корня репозитория.
     media_dir: Path = Path("var/media")
 
+    # --- Админпанель (/admin): временный вход одним администратором до этапа С6 ---
+    # Если логин или пароль не заданы, войти в админпанель нельзя.
+    admin_username: str | None = None
+    admin_password: SecretStr | None = None
+
     @field_validator("secret_key")
     @classmethod
     def _check_secret_key(cls, value: SecretStr) -> SecretStr:
