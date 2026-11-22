@@ -8,8 +8,9 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Annotated, Literal
 
-from pydantic import Field, SecretStr, field_validator
+from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
+from sqlalchemy.engine import make_url
 
 # backend/app/config.py -> корень репозитория (на два уровня выше папки app).
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -86,6 +87,17 @@ class Settings(BaseSettings):
     @classmethod
     def _resolve_media_dir(cls, value: Path) -> Path:
         return value if value.is_absolute() else (REPO_ROOT / value).resolve()
+
+    # Имя отдельной тестовой базы вместо базы из TEST_DATABASE_URL (тот же сервер и пользователь).
+    # Нужен, когда несколько прогонов pytest идут параллельно: у каждого своя база.
+    test_db_name: str | None = None
+
+    @model_validator(mode="after")
+    def _apply_test_db_name(self) -> Settings:
+        if self.test_db_name and self.test_database_url is not None:
+            url = make_url(self.test_database_url.get_secret_value()).set(database=self.test_db_name)
+            self.test_database_url = SecretStr(url.render_as_string(hide_password=False))
+        return self
 
 
 @lru_cache
