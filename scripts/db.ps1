@@ -1,4 +1,4 @@
-# Управление локальным PostgreSQL стенда (переносная сборка, без службы Windows).
+﻿# Управление локальным PostgreSQL стенда (переносная сборка, без службы Windows).
 # Использование: .\scripts\db.ps1 start | stop | status | psql [база]
 # Пути можно переопределить переменными окружения PG_HOME и PG_DATA.
 # Пароли не хранятся здесь: psql берёт их из %APPDATA%\postgresql\pgpass.conf.

@@ -6,13 +6,14 @@
 ## Контракт и взаимодействие с 1С
 - Контракт: `c:\_1c_edt\rt_httpsvc\collab\files\api_spec.md`. **Поддерживаемая версия: 0.9.1** (К-9: `parent_id`, `group_id`, `unit_id` могут быть null) (К-4: Basic + Bearer, `401` с `WWW-Authenticate`, номер `D-000001`, картинка 4 МБ / 40 Мп; К-8: отбор групп, `sort` у групп, правила витрины 3.6).
 - Правила взаимодействия сессий: `c:\_1c_edt\rt_httpsvc\collab\protocol_claude.md` (v1.0).
-- Журнал контракта: `c:\_1c_edt\rt_httpsvc\collab\files\contract_journal.md`. Учтено до: К-13.
+- Журнал контракта: `c:\_1c_edt\rt_httpsvc\collab\files\contract_journal.md`. Учтено до: К-15.
 - Эталон принимающей стороны: `collab\files\mock_app\mock_app.py` (заглушка, порт 8085).
 - Файлы `collab\` и проекты EDT не изменяем; исключение — дописывание в журнал контракта.
 
 ## Стенд
 - Backend http://127.0.0.1:8090; адрес API приложения для 1С: `http://localhost:8090/exchange/1c` (логин `onec_exchange`, пароль — `.env`).
 - Frontend http://localhost:3000 (Vite, proxy `/api`, `/media` → 8090).
+- Запуск и остановка стенда: `scripts\start.ps1` / `scripts\stop.ps1`, инструкция — `docs/ЗАПУСК.md`. После перезагрузки база сама не стартует.
 - PostgreSQL 18.7: 127.0.0.1:5433, `scripts\db.ps1 start|stop|status|psql`; базы `delivery_site`, `delivery_site_test`.
 - API 1С: `http://localhost/rt/hs/abv_app/v1`, пользователь `app_api` (пароль пользователь вписывает в `.env`, `ONEC_API_PASSWORD`).
 - Тестовые GUID: магазин `423a7136-cfce-11ed-b67f-a8a159e65459`; ванилин `4730ff25-5b92-11ee-b698-a8a159e65459`.
@@ -50,4 +51,4 @@
 ## Открытые вопросы к 1С
 - нет. (Bearer 1С пока не отправляет — доработка 1С отдельным решением пользователя, К-4.)
 
-Учтено до: журнал сайта №11, журнал контракта К-13
+Учтено до: журнал сайта №11, журнал контракта К-15
