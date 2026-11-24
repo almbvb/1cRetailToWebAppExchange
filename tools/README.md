@@ -65,3 +65,18 @@ backend\.venv\Scripts\python.exe tools\replay_mock.py --dry-run --only orders --
 
 HTTP — только стандартная библиотека (`urllib`); для `--verify` нужны SQLAlchemy и psycopg из
 `backend\.venv`.
+
+## clear_catalog.py — очистка каталога перед полной выгрузкой
+
+По `api_spec.md` 0.10 (3.1, К-19) перед «Полной выгрузкой» из 1С каталог сайта стоит очистить: полная
+выгрузка не удаляет записи, вышедшие из отбора раньше неё. Скрипт очищает `catalog_units`,
+`catalog_groups`, `catalog_products`, `catalog_prices`, `catalog_stock`, `catalog_images` и папку
+`MEDIA_DIR\products`. Заказы и журнал обмена не трогает. База и папка — из `.env`.
+
+```powershell
+# показать, что будет удалено (ничего не удаляет)
+backend\.venv\Scripts\python.exe tools\clear_catalog.py
+
+# удалить
+backend\.venv\Scripts\python.exe tools\clear_catalog.py --yes
+```
